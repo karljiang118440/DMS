@@ -11,16 +11,43 @@
 #include <vector>
 #include <algorithm>
 
-int demo(cv::Mat& image, ncnn::Net &detector, int detector_size_width, int detector_size_height)
+int runlandmark(cv::Mat& roi, cv::Mat& image, ncnn::Net &landmark, int landmark_size_width, int landmark_size_height, float x1, float y1)
 {
+    int w = roi.cols;
+    int h = roi.rows;
+    ncnn::Mat in = ncnn::Mat::from_pixels_resize(roi.data, ncnn::Mat::PIXEL_BGR,\
+                                                 roi.cols, roi.rows, landmark_size_width, landmark_size_height);
+    //数据预处理
+    const float mean_vals[3] = {127.5f, 127.5f, 127.5f};
+    const float norm_vals[3] = {1/127.5f, 1/127.5f, 1/127.5f};
+    in.substract_mean_normalize(mean_vals, norm_vals);
 
-    static const char* class_names[] = {"background",
-                                        "aeroplane", "bicycle", "bird", "boat",
-                                        "bottle", "bus", "car", "cat", "chair",
-                                        "cow", "diningtable", "dog", "horse",
-                                        "motorbike", "person", "pottedplant",
-                                        "sheep", "sofa", "train", "tvmonitor"
-                                       };
+    ncnn::Extractor ex = landmark.create_extractor();
+    ex.set_num_threads(16);
+    ex.input("data", in);
+    ncnn::Mat out;
+    ex.extract("prelu1", out);
+
+    float sw, sh;
+	sw = (float)w/(float)landmark_size_width;
+	sh = (float)h/(float)landmark_size_width;
+    
+    for (int i = 0; i < 64; i++)
+    {
+        float px,py;
+        px = out[i*2]*landmark_size_width*sw+x1;
+        py = out[i*2+1]*landmark_size_width*sh+y1;
+	    //画实心点
+	    cv::circle(image, cv::Point(px, py), 1, cv::Scalar(255,255,255),-1);
+    }
+
+    return 0;
+}
+
+
+int demo(cv::Mat& image, ncnn::Net &detector, int detector_size_width, int detector_size_height, \
+         ncnn::Net &landmark, int landmark_size_width, int landmark_size_height)
+{
 
     cv::Mat bgr = image.clone();
     int img_w = bgr.cols;
@@ -35,31 +62,18 @@ int demo(cv::Mat& image, ncnn::Net &detector, int detector_size_width, int detec
     in.substract_mean_normalize(mean_vals, norm_vals);
 
     ncnn::Extractor ex = detector.create_extractor();
-    ex.set_num_threads(4);
-
-    // printf(" threads = 4 \n");
-
-
-
-
-
+    ex.set_num_threads(16);
     ex.input("data", in);
     ncnn::Mat out;
-
-    double start1 = ncnn::get_current_time();
+    // ex.extract("output", out);
 
     ex.extract("output", out);
 
-
-    double end1 = ncnn::get_current_time();
-    double time1 = end1 - start1;
-    printf("extract Time:%7.2f \n",time1);
-
+    
 
     for (int i = 0; i < out.h; i++)
     {
-        int label;
-        float x1, y1, x2, y2, score;
+        float x1, y1, x2, y2, score, label;
         float pw,ph,cx,cy;
         const float* values = out.row(i);
         
@@ -67,6 +81,16 @@ int demo(cv::Mat& image, ncnn::Net &detector, int detector_size_width, int detec
         y1 = values[3] * img_h;
         x2 = values[4] * img_w;
         y2 = values[5] * img_h;
+
+        pw = x2-x1;
+        ph = y2-y1;
+        cx = x1+0.5*pw;
+        cy = y1+0.5*ph;
+
+        x1 = cx - 0.55*pw;
+        y1 = cy - 0.35*ph;
+        x2 = cx + 0.55*pw;
+        y2 = cy + 0.55*ph;
 
         score = values[1];
         label = values[0];
@@ -81,29 +105,46 @@ int demo(cv::Mat& image, ncnn::Net &detector, int detector_size_width, int detec
         if(y1>img_h) y1=img_h;
         if(x2>img_w) x2=img_w;
         if(y2>img_h) y2=img_h;
-        cv::rectangle (image, cv::Point(x1, y1), cv::Point(x2, y2), cv::Scalar(255, 255, 0), 1, 1, 0);
+        
+        //限制人脸关键点检测roi图像>66x66
+        if( x2-x1 > 66 && y2 -y1 > 66){
+            //截取人体ROI
+            cv::Mat roi;
+            roi = bgr(cv::Rect(x1, y1, x2-x1, y2-y1)).clone();
+            runlandmark(roi, image, landmark, landmark_size_width, landmark_size_height, x1, y1);
+            cv::rectangle (image, cv::Point(x1, y1), cv::Point(x2, y2), cv::Scalar(255, 255, 0), 1, 1, 0);
+        }
 
-        char text[256];
-        sprintf(text, "%s %.1f%%", class_names[label], score * 100);
-        int baseLine = 0;
-        cv::Size label_size = cv::getTextSize(text, cv::FONT_HERSHEY_SIMPLEX, 0.5, 1, &baseLine);
-        cv::putText(image, text, cv::Point(x1, y1 + label_size.height),
-                    cv::FONT_HERSHEY_SIMPLEX, 0.5, cv::Scalar(0, 0, 0));
     }
+
+
     return 0;
 }
-
 //摄像头测试
 int test_cam()
 {
-    //定义yolo-fastest VOC检测器
+    //定义yoloface-500k人脸检测器
     ncnn::Net detector;  
 
-    detector.load_param("../models/yolo-fastest.param");
-    detector.load_model("../models/yolo-fastest.bin");
+    detector.load_param("../models/yoloface-500k.param");
+    detector.load_model("../models/yoloface-500k.bin");
 
     int detector_size_width  = 320;
-    int detector_size_height = 320;
+    int detector_size_height = 256;
+
+
+
+    //定义106关键点预测器
+    ncnn::Net landmark;  
+    // landmark.load_param("../models/yolo/landmark106.param");
+    // landmark.load_model("../models/yolo/landmark106.bin");
+
+    landmark.load_param("../models/iris_lnet.param");
+    landmark.load_model("../models/iris_lnet.bin");
+
+
+    int landmark_size_width  =  160;
+    int landmark_size_height =  80;
 
     cv::Mat frame;
     cv::VideoCapture cap(0);
@@ -112,7 +153,8 @@ int test_cam()
     {
         cap >> frame;
         double start = ncnn::get_current_time();
-        demo(frame, detector, detector_size_width, detector_size_height);
+        demo(frame, detector, detector_size_width, detector_size_height, landmark, landmark_size_width, landmark_size_height);
+        //demo(frame, detector, 1280, 1080, landmark, landmark_size_width, landmark_size_height);
         double end = ncnn::get_current_time();
         double time = end - start;
         printf("Time:%7.2f \n",time);
@@ -121,84 +163,8 @@ int test_cam()
     }
     return 0;
 }
-
-
-int test_picture()
-{
-    //定义yolo-fastest VOC检测器
-    ncnn::Net detector;  
-    detector.load_param("model/yolo-fastest.param");
-    detector.load_model("model/yolo-fastest.bin");
-    int detector_size_width  = 320;
-    int detector_size_height = 320;
-
-    cv::Mat frame = cv::imread("test.png");
-
-    while(1){
-
-    double start = ncnn::get_current_time();
-    demo(frame, detector, detector_size_width, detector_size_height);
-    double end = ncnn::get_current_time();
-    double time = end - start;
-    printf("Time:%7.2f \n",time);
-
-    }
-
-
-    return 0;
-}
-
-
-
-
-int test_video()
-{
-    //定义yolo-fastest VOC检测器
-    ncnn::Net detector;  
-    detector.load_param("model/yolo-fastest.param");
-    detector.load_model("model/yolo-fastest.bin");
-    int detector_size_width  = 320;
-    int detector_size_height = 320;
-
-    cv::Mat frame = cv::imread("test.png");
-
-    while(1){
-
-
-        cv::VideoCapture capture;
-        capture.open("/home/root/airunner/data/airunner/video_clips/university_traffic.avi");
-
-        if(!capture.isOpened()){
-            printf("cannot open the video \n");
-        }
-
-        cv::Mat frame_video ;
-        capture >> frame_video;
-
-        double start = ncnn::get_current_time();
-
-        demo(frame_video,detector,detector_size_height,detector_size_height);
-        
-        double end = ncnn::get_current_time();
-        double time = end -start;
-        printf("Time : %7.2f \n",time);
-
-    }
-
-
-    // double start = ncnn::get_current_time();
-    // demo(frame, detector, detector_size_width, detector_size_height);
-    // double end = ncnn::get_current_time();
-    // double time = end - start;
-    // printf("Time:%7.2f \n",time);
-
-    // return 0;
-}
-
-
 int main()
 {
-    // test_picture();
     test_cam();
     return 0;
 }
