@@ -20,6 +20,9 @@ using namespace cv;
 
 
 
-int pfpld_detect();
+// int pfpld_detect();
+
+int pfpld_detect(cv::Mat & img_cnn);
+
 
 
