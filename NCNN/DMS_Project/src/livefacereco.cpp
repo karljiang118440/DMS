@@ -21,6 +21,7 @@
 
 
 #include "nanodet_hand_test.hpp"
+#include "detect_camera_test.hpp"
 
 
 #include<opencv2/highgui.hpp>
@@ -399,19 +400,11 @@ int MTCNNDetection() {
            
 
 
-
-
-
-
-
-
            /* 
            1) 对 result_cnn 的数据进行复制，之后再进行处理 
            2) hand_data 进行处理   -- add by karl :20210823
            
            */
-
-
 
             cv::Mat hand_data;
 
@@ -422,12 +415,25 @@ int MTCNNDetection() {
 
 
             std::vector<Object> objects;
-
             detect_nanodet(hand_data,objects);
             draw_objects(hand_data,objects);
 
 
-            cv::imshow("image", hand_data);
+
+           /* 
+           1) 对 result_cnn 的数据进行复制，之后再进行处理 
+           2) pfpld 进行处理   -- add by karl :20210824
+           
+           */
+
+            pfpld_detect(hand_data);
+
+
+
+
+
+
+            cv::imshow("image", hand_data); // 经过实际测试，该代码可以显示 hand_data 
             cv::waitKey(1);
 
 
