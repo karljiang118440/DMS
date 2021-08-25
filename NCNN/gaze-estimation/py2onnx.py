@@ -53,7 +53,12 @@ dummy_input = Variable(torch.randn(3, 160, 96))
 
 input_names = ["input"]
 output_names = ["output"]
-torch.onnx.export(eyenet, dummy_input, "eyenet.onnx",opset_version=11)
+# torch.onnx.export(eyenet, dummy_input, "eyenet.onnx",opset_version=11)
 
 # torch.onnx.export(eyenet, dummy_input, "{}_{}_{}.onnx".format(MODEL_TYPE, INPUT_SIZE, WIDTH_FACTOR), \
 #     verbose=False, input_names=input_names, output_names=output_names)
+
+
+
+torch.onnx.export(eyenet, dummy_input,"eyenet-1.onnx",\
+     verbose=False, input_names=input_names, output_names=output_names)    
