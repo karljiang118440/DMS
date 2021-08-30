@@ -22,6 +22,28 @@
 
 #include "nanodet_hand_test.hpp"
 #include "detect_camera_test.hpp"
+#include "Display.hpp"
+
+
+
+/* 显示 pfpld 的参数结果 -- add by karl:20210830
+
+1). add head files 
+
+
+*/
+
+#include "anchor_generator.h"
+#include "opencv2/opencv.hpp"
+#include "config.h"
+#include "tools.h"
+#include "pfpld.id.h"
+
+
+//****  end ****//
+
+
+
 
 
 #include<opencv2/highgui.hpp>
@@ -75,9 +97,48 @@ inline cv::Mat draw_conclucion(String intro, double input, cv::Mat result_cnn, i
     sprintf(string, "%.2f", input);
     std::string introString(intro);
     introString += string;
-    putText(result_cnn, introString, cv::Point(5, position), cv::FONT_HERSHEY_SIMPLEX, 0.75, cv::Scalar(0, 255, 255),2);
+    putText(result_cnn, introString, cv::Point(5, position), cv::FONT_HERSHEY_SIMPLEX, 0.75, cv::Scalar(0, 0, 255),2);
     return result_cnn;
 }
+
+
+
+/*将监控板放在画面中 -- add by karl:20210827
+
+
+*/
+
+
+
+inline cv::Mat draw_conclucion_monitorboard(String intro, double input, cv::Mat result_cnn, int position) {
+
+    cv::Mat temp = result_cnn.clone();
+    cv::Mat logo = cv::imread("backgroud_dms.png");
+     if (!logo.data)
+     {
+	     std::cout << "wpi log load filed" << std::endl;
+	    //   return -1;
+     }
+
+	  //------add wpi logo------
+	// cv::Mat imageROI = temp(cv::Rect(temp.cols - logo.cols, temp.rows - logo.rows, logo.cols, logo.rows)); 
+
+	cv::Mat imageROI = temp(cv::Rect(0, 0, logo.cols, logo.rows)); 
+	// cv::addWeighted(temp, 0.2, logo, 0.8, 0.0, result_cnn);
+	cv::addWeighted(imageROI, 0.2, logo, 0.8, 0.0, imageROI);
+
+    char string[10];
+    sprintf(string, "%.2f", input);
+    std::string introString(intro);
+    introString += string;
+    putText(temp, introString, cv::Point(5, position), cv::FONT_HERSHEY_SIMPLEX, 0.75, cv::Scalar(0, 255, 255),2);
+    return temp;
+	  //-----end add wpi logo------
+
+
+}
+
+
 /**
  * Face Recognition pipeline using camera. 
  * Firstly, it will use MTCNN face detector to detect the faces [x,y,x2,y2] and [eyes, nose, cheeks] landmarks
@@ -275,7 +336,14 @@ int MTCNNDetection() {
                             cv::String name = image_names[maxPosition].erase(0,slant_position+1);
                             name=name.erase( name.length()-4, name.length()-1);
                             hi_name="Hi,"+name;
-                            putText(result_cnn, hi_name, cv::Point(5, 60), cv::FONT_HERSHEY_SIMPLEX,0.75, cv::Scalar(255, 0, 0),2);
+
+                            // putText(result_cnn, hi_name, cv::Point(5, 60), cv::FONT_HERSHEY_SIMPLEX,0.75, cv::Scalar(255, 0, 0),2);
+
+
+                            putText(result_cnn, hi_name, cv::Point(5, 100), cv::FONT_HERSHEY_SIMPLEX,0.75, cv::Scalar(255, 0, 0),2);
+
+
+
                             cout<<name<<endl;
                             //determin whethe it is a fake face
                             confidence=live.Detect(frame,live_box);
@@ -395,9 +463,28 @@ int MTCNNDetection() {
                 if(fpsnum_>=300) fps.clear();
 
             }
-            result_cnn = draw_conclucion("FPS: ", fps_mean, result_cnn, 20);//20
-            result_cnn = draw_conclucion("Angle: ", angle, result_cnn, 40);//65
-           
+
+            // result_cnn = draw_conclucion("FPS: ", fps_mean, result_cnn, 20);//20              
+            // result_cnn = draw_conclucion_monitorboard("Angle: ", angle, result_cnn, 40);//65
+
+
+            /*  monitor_board 信息显示模块  -- add by karl:20210830
+            
+            
+            */
+            result_cnn = draw_conclucion("FPS: ", fps_mean, result_cnn, 150);//20              
+            result_cnn = draw_conclucion_monitorboard("Angle: ", angle, result_cnn, 120);//65  
+
+
+            int headpose_y = 230;
+            result_cnn = draw_conclucion("Yaw: ", angles[0], result_cnn, headpose_y);             
+            result_cnn = draw_conclucion("pitch: ", fps_mean, result_cnn, headpose_y + 20 );   
+            result_cnn = draw_conclucion("Roll: ", fps_mean, result_cnn, headpose_y + 40);
+
+            //*********              end             ************//
+
+
+
 
 
            /* 
@@ -411,6 +498,17 @@ int MTCNNDetection() {
             // hand_data =  frame.clone();
 
             hand_data =  result_cnn.clone();
+
+
+            /* 
+            1)、进行logo 信息显示模块
+            
+            */
+            // display(hand_data);
+            // MonitorBoard( hand_data);
+
+
+
 
 
 
@@ -433,6 +531,7 @@ int MTCNNDetection() {
 
 
 
+
             cv::imshow("image", hand_data); // 经过实际测试，该代码可以显示 hand_data 
             cv::waitKey(1);
 
@@ -443,3 +542,5 @@ int MTCNNDetection() {
 
         }
 }
+
+
