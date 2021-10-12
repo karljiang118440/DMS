@@ -4,10 +4,10 @@
 #include "tools.h"
 #include "pfpld.id.h"
 
+#include <iostream>
+#include <stdio.h>
 
-#define _NCNN_PARAM False  // use ncnnoptimize tools to optimize models by karl:20210528
-
-
+using namespace std;
 
 /*
 
@@ -24,75 +24,37 @@ karl:20210528
 */
 
 /*
-1). add image show function 
+1). add image show function
+
+
+2).删去人脸显示框，和其他魔抗重复
 
 */
 
-int pfpld_detect_display(cv::Mat & img){
 
-	// cv::Mat img;
-
-
-	//  add fps karl:20210528
-
-	// char string[10];
-	// double t =0;
-	// double fps;
-	
-
-	cv::VideoCapture cap(0);
-
-	while(true){
-
-		cap >> img;
-
-		if(img.empty()){
-
-			printf("capture faild \n");
-			return -1;
-		}
-	}
-
-    cv::imshow("img", img);
-
-	// t = ((double)cv::getTickCount() - t) / cv::getTickFrequency();
-
-	// fps = 1.0 /t;
-
-	// sprintf(string, "%.2f",fps);
-
-	// std::string fpsString("FPS: ");
-	// fpsString += string;
-
-	// printf("%f \n", fps);
-
-	// cv::putText(img,fpsString,cv::Point(100,100),cv::FONT_HERSHEY_COMPLEX,0.5,cv::Scalar(100,0,0));
-
-    // if(cv::waitKey(20) > 0)
-    //     break;
-
-
+int draw_conclucion_1(string intro, double input, cv::Mat result_cnn, int position) {
+    char string[10];
+    sprintf(string, "%.2f", input);
+    std::string introString(intro);
+    introString += string;
+    putText(result_cnn, introString, cv::Point(5, position), cv::FONT_HERSHEY_SIMPLEX, 0.6, cv::Scalar(0, 0, 255),1);
+    // return result_cnn;
 }
 
 
-int pfpld_detect(cv::Mat & img_cnn) {
+
+
+cv::Mat pfpld_detect_test(cv::Mat  img_cnn) {
     extern float pixel_mean[3];
     extern float pixel_std[3];
 
-	#ifdef _NCNN_PARAM // use ncnnoptimize tools to optimize models by karl:20210528
-
 	std::string param_path =  "../models/pfpld/scrfd_500m-opt2.param";
 	std::string bin_path = "../models/pfpld/scrfd_500m-opt2.bin";
-	std::string pfpld_path = "../models/pfpld/pfpld.ncnnmodel";
 
-	#else 
+	// std::string pfpld_path = "../models/pfpld/pfpld.ncnnmodel";
 
-	std::string param_path =  "../models/pfpld/retina.param";
-	std::string bin_path = "../models/pfpld/retina.bin";
-	std::string pfpld_path = "../models/pfpld/pfpld.ncnnmodel";
 
-	#endif 
-
+	std::string pfpld_path = "../models/pfpld/pfpld_test.ncnnmodel";
 
 	ncnn::Net _net, pfpld_net;
 	_net.load_param(param_path.data());
@@ -151,10 +113,15 @@ int pfpld_detect(cv::Mat & img_cnn) {
     // printf("final result %d\n", result.size());
     for(int i = 0; i < result.size(); i ++)
     {
-        cv::rectangle (img_cnn, cv::Point((int)result[i].finalbox.x, (int)result[i].finalbox.y), cv::Point((int)result[i].finalbox.width, (int)result[i].finalbox.height), cv::Scalar(255, 255, 0), 2, 8, 0);
-//        for (int j = 0; j < result[i].pts.size(); ++j) {
-//        	cv::circle(img_cnn, cv::Point((int)result[i].pts[j].x, (int)result[i].pts[j].y), 1, cv::Scalar(225, 0, 225), 2, 8);
-//        }
+
+        // cv::rectangle (img_cnn, cv::Point((int)result[i].finalbox.x, (int)result[i].finalbox.y), cv::Point((int)result[i].finalbox.width, (int)result[i].finalbox.height), cv::Scalar(255, 255, 0), 2, 8, 0);
+  
+
+
+
+       for (int j = 0; j < result[i].pts.size(); ++j) {
+       	cv::circle(img_cnn, cv::Point((int)result[i].pts[j].x, (int)result[i].pts[j].y), 1, cv::Scalar(225, 0, 225), 2, 8);
+       }
         int x1 = (int)result[i].finalbox.x;
         int y1 = (int)result[i].finalbox.y;
         int x2 = (int)result[i].finalbox.width;
@@ -210,6 +177,8 @@ int pfpld_detect(cv::Mat & img_cnn) {
 		ncnn::Mat pose, landms;
         std::vector<float> angles;
         std::vector<float> landmarks;
+
+
 		pfpld_ex.input(pfpld_param_id::BLOB_input, ncnn_img);
 		pfpld_ex.extract(pfpld_param_id::BLOB_pose, pose);
 		pfpld_ex.extract(pfpld_param_id::BLOB_landms, landms);
@@ -224,12 +193,14 @@ int pfpld_detect(cv::Mat & img_cnn) {
             float tmp_y = landms[2 * j + 1] * size_h + y1 -bottom;
             landmarks.push_back(tmp_x);
             landmarks.push_back(tmp_y);
-            cv::circle(img_cnn, cv::Point((int)tmp_x, (int)tmp_y), 1, cv::Scalar(0,255,0), 1);
+            cv::circle(img_cnn, cv::Point((int)tmp_x, (int)tmp_y), 1, cv::Scalar(0,255,0), 1);  // 显示人脸的坐标 -- add by karl:20210830
 		}
-		std::cout<<angles[0]<<"  "<<angles[1]<<"  "<<angles[2]<<std::endl;
+		// std::cout<<angles[0]<<"  "<<angles[1]<<"  "<<angles[2]<<std::endl;
 		plot_pose_cube(img_cnn, angles[0], angles[1], angles[2], (int)result[i].pts[2].x, (int)result[i].pts[2].y, w / 2);
 
 
+
+		float angles1 = angles[0];
 
 	/* 在界面中显示角度 -- add by karl:20210830
 
@@ -238,23 +209,37 @@ int pfpld_detect(cv::Mat & img_cnn) {
 	
 	*/
 
-    putText(img_cnn, "yaw:" + std::to_string(angles[0]), cv::Point(5, 300), cv::FONT_HERSHEY_SIMPLEX, 0.6, cv::Scalar(0, 0, 255),2);
-    putText(img_cnn, "pitch:" + std::to_string(angles[1]), cv::Point(5, 320), cv::FONT_HERSHEY_SIMPLEX, 0.6, cv::Scalar(0, 0, 255),2);
-    putText(img_cnn, "roll:" + std::to_string(angles[2]), cv::Point(5, 340), cv::FONT_HERSHEY_SIMPLEX, 0.6, cv::Scalar(0, 0, 255),2);
+    // putText(img_cnn, "yaw:    " + std::to_string(angles[0]), cv::Point(5, 300), cv::FONT_HERSHEY_SIMPLEX, 0.6, cv::Scalar(0, 0, 255),2);
+    // putText(img_cnn, "pitch:    " + std::to_string(angles[1]), cv::Point(5, 320), cv::FONT_HERSHEY_SIMPLEX, 0.6, cv::Scalar(0, 0, 255),2);
+  
+    // putText(img_cnn, "roll:    " + std::to_string(angles[2]), cv::Point(5, 340), cv::FONT_HERSHEY_SIMPLEX, 0.6, cv::Scalar(0, 0, 255),2);
 
 
+
+
+	int Y_headpose = 420;
+    draw_conclucion_1("Yaw: ", angles[0], img_cnn, Y_headpose); 
+
+    draw_conclucion_1("Pitch: ", angles[1], img_cnn, Y_headpose+20);   
+
+    draw_conclucion_1("Roll: ", angles[2], img_cnn, Y_headpose + 40);   
 
     }
 
-	// cv::imshow("image", img_cnn);
-	// // cv::waitKey(1);
 
+
+	/* 
+	1） 如果不添加如下内容，则无法在画面中在界面中显示 -- add by karl:20210921
+
+	*/
+
+	// cv::imshow("image", img_cnn);
+	// cv::waitKey(1);
+
+	return img_cnn;
 
 
 }
-
-
-
 
 
 
