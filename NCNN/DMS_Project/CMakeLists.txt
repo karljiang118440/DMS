@@ -40,6 +40,13 @@ endif()
 INCLUDE_DIRECTORIES(${CMAKE_CURRENT_LIST_DIR}/src)
 INCLUDE_DIRECTORIES(${CMAKE_CURRENT_LIST_DIR}/include/ncnn)
 
+# add include files -- by karl:20210820
+INCLUDE_DIRECTORIES(${CMAKE_CURRENT_LIST_DIR}/src/include/nanodet_hand)
+INCLUDE_DIRECTORIES(${CMAKE_CURRENT_LIST_DIR}/src/include/pfpld)
+INCLUDE_DIRECTORIES(${CMAKE_CURRENT_LIST_DIR}/src/include/Display)
+INCLUDE_DIRECTORIES(${CMAKE_CURRENT_LIST_DIR}/src/include/landmark)
+
+
 find_package(OpenMP REQUIRED)
 if(OPENMP_FOUND)
     message("OPENMP FOUND")
@@ -60,18 +67,31 @@ ADD_LIBRARY(facedetect STATIC
 			src/mtcnn_new.h
 
 			#hand det --by karl:20210820
-			src/nanodet_hand.cpp
-			src/nanodet_hand.hpp
+			src/nanodet_hand/nanodet_hand.cpp
 
 
 			#landmarks  --by karl:20210820			
-			src/landmark.cpp
-			src/landmark.hpp
+			src/pfpld/anchor_generator.cpp
+			src/pfpld/config.cpp
+			src/pfpld/detect_camera.cpp
+			src/pfpld/detect.cpp
+			src/pfpld/tools.cpp
+
+			#Display--by karl:20210820
+			src/Display/Display.cpp
 
 			# face tracking  --by karl:20210820
 			# src/facetrack.cpp
 			# src/facetrack.hpp
 
+
+			# 106landmarks  --by karl:20210916
+			src/landmark/yoloface_landmark106.cpp
+
+
+
+			# gaze_estimation  --by karl:20211012
+			src/gaze_estimation/mobile_face_gaze.cpp
 
 
 )
